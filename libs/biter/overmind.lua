@@ -18,19 +18,23 @@ Event.register(defines.events.on_tick, function(event)
 
     -- accrue a tiny amount of currency due to the passage of time
     if event.tick % 600 == 0 then
+		local add_currency
+		
         if not global.bases or #global.bases < 3 then
-            global.overmind.currency = global.overmind.currency + 100
+            add_currency = 100
         elseif #global.bases < 50 then
-            global.overmind.currency = global.overmind.currency + 10 + (50 - #global.bases)
+            add_currency = 10 + (50 - #global.bases)
         else
-            global.overmind.currency = global.overmind.currency + 10
+            add_currency = 10
         end
 
         if game.evolution_factor < 0.1 then
-            global.overmind.currency = math.floor(global.overmind.currency / 5)
+            add_currency = math.floor(add_currency / 5)
         elseif game.evolution_factor < 0.2 then
-            global.overmind.currency = math.floor(global.overmind.currency / 2)
+            add_currency = math.floor(add_currency / 2)
         end
+		
+		global.overmind.currency = global.overmind.currency + add_currency
     end
 
     -- clear out any tracked entities that have expired their max_age
