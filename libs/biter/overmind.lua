@@ -69,43 +69,44 @@ Overmind.stages.decide = function(data)
             if global.overmind.currency > 100000 then
                 if math.random(100) < 75 then
                     Log("Overmind selects spread early and expensive hive spawner")
-                    global.overmind.currency = global.overmind.currency - 25000
+                    data.cost = 25000
                     return 'fast_spread_spawner'
                 end
             end
 
             if math.random(100) < 10 then
                 Log("Overmind selects early biter spawn")
-                global.overmind.currency = global.overmind.currency - 3000
+				data.cost = 3000
                 return 'spawn_biters'
             end
 
             -- Early
             if math.random(100) < 33 and game.evolution_factor < 0.33 then
                 Log("Overmind selects early evolution factor boost")
-                global.overmind.currency = global.overmind.currency - 10000
                 data.extra_factor = 0.0000125
                 data.iterations = 3200
+				data.cost = 3	-- per iteration
                 return 'increase_evolution_factor'
             end
 
             if math.random(100) < 33 then
                 Log("Overmind selects spread hive spawner")
-                global.overmind.currency = global.overmind.currency - 10000
+				data.cost = 10000
                 return 'spread_spawner'
             end
 
             if math.random(100) < 25 and global.overmind.currency > 200000 then
                 Log("Overmind selects donate currency to poor")
-                global.overmind.currency = global.overmind.currency - 10000
+				data.iterations = 10
+				data.cost = 1000
                 return 'donate_currency_to_poor'
             end
 
-            if math.random(100) < 10 and game.evolution_factor < 0.8 and (global.overmind.last_evo_boost + Time.MINUTE * 30) < game.tick then
+            if math.random(100) < 10 and game.evolution_factor < 0.8 and game.evolution_factor >= 0.33 and (global.overmind.last_evo_boost + Time.MINUTE * 30) < game.tick then
                 Log("Overmind selects late evolution factor boost")
-                global.overmind.currency = global.overmind.currency - 10000
                 data.extra_factor = 0.0000125
                 data.iterations = 3200
+				data.cost = 3 + math.floor((game.evolution_factor - 0.3) * 14)  -- per iteration, between 3 - 10
                 return 'increase_evolution_factor'
             end
 
@@ -116,23 +117,19 @@ end
 
 Overmind.tick_rates.donate_currency_to_poor = Time.MINUTE * 1
 Overmind.stages.donate_currency_to_poor = function(data)
-    if not data.iterations then
-        data.iterations = 1
-    end
     if global.overmind.currency > 10000 then
         local start_currency = global.overmind.currency
-        table.each(table.filter(global.bases, Game.VALID_FILTER), function(base)
-            if base.currency.amt < 6000 and global.overmind.currency > 1000 then
-                base.currency.amt = base.currency.amt + 1000
-                global.overmind.currency = global.overmind.currency - 1000
+        
+		table.each(table.filter(global.bases, Game.VALID_FILTER), function(base)
+            if base.currency.amt < 6000 and global.overmind.currency > data.cost then
+                base.currency.amt = base.currency.amt + data.cost
+                global.overmind.currency = global.overmind.currency - data.cost
             end
         end)
-        data.iterations = data.iterations + 1
-        if data.iterations > 10 then
-            return 'decide'
-        end
+		
+        data.iterations = data.iterations - 1
         -- successfully found donation targets
-        if start_currency > global.overmind.currency then
+        if start_currency > global.overmind.currency and data.iterations > 0 then
             return 'donate_currency_to_poor'
         end
     end
@@ -142,9 +139,10 @@ end
 
 Overmind.tick_rates.increase_evolution_factor = 10
 Overmind.stages.increase_evolution_factor = function(data)
-    if data.iterations > 0 then
+    if data.iterations > 0 and global.overmind.currency > data.cost then
         data.iterations = data.iterations - 1
         game.evolution_factor = game.evolution_factor + data.extra_factor
+		global.overmind.currency = global.overmind.currency - data.cost
         return 'increase_evolution_factor'
     end
 
@@ -218,6 +216,8 @@ Overmind.stages.spawn_biters = function(data)
         unit_group.start_moving()
     end
 
+	-- success, deduct currency
+	global.overmind.currency = global.overmind.currency - data.cost
     return 'decide'
 end
 
@@ -262,6 +262,8 @@ Overmind.stages.spread_spawner = function(data)
         Log("Unable to spawn new base at chunk %s", Chunk.to_string(chunk))
     end
 
+	-- success, deduct currency
+    global.overmind.currency = global.overmind.currency - data.cost
     return 'decide'
 end
 
